@@ -18,38 +18,37 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.JUnit4
 import org.mockito.Mock
+import org.mockito.junit.MockitoJUnit
+import org.mockito.junit.MockitoRule
 import org.mockito.kotlin.doAnswer
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.reset
 import org.mockito.kotlin.stub
 
 
+@RunWith(JUnit4::class)
 class TurbineViewModelTest {
 
-
     @Mock
-    private var heavyComputation: HeavyComputationTemplate = mock()
+    lateinit var heavyComputation: HeavyComputationTemplate
 
-    private var sut: ExampleViewModel = ExampleViewModel(heavyComputation)
-
+    @get:Rule
+    val mockitoRule: MockitoRule = MockitoJUnit.rule()
 
     @Before
-    fun setUp() {
-        sut = ExampleViewModel(heavyComputation)
-        Dispatchers.setMain(StandardTestDispatcher())
-    }
+    fun setUp() = Dispatchers.setMain(StandardTestDispatcher())
 
     @After
-    fun tearDown() {
-        reset(heavyComputation)
-        Dispatchers.resetMain()
-    }
+    fun tearDown() = Dispatchers.resetMain()
 
     @Test
-    fun `Given the sut is initialized, then it waits for event`() =
+    fun `Given the sut is initialized, then it waits for event`() {
+        val sut = ExampleViewModel(heavyComputation)
         assertTrue(sut.vmState.value == VmState.Waiting)
+    }
 
     @Test
     fun `Given the ViewModel waits - When the event OnLaunch comes, then execute heavy computation with result`() =
@@ -59,6 +58,9 @@ class TurbineViewModelTest {
             heavyComputation.stub {
                 onBlocking { doComputation() } doAnswer { expectedString }
             }
+
+            val sut = ExampleViewModel(heavyComputation)
+
 
             sut.vmState.test {
 
@@ -81,6 +83,8 @@ class TurbineViewModelTest {
             heavyComputation.stub {
                 onBlocking { doComputation() } doAnswer { expectedString }
             }
+
+            val sut = ExampleViewModel(heavyComputation)
 
             val firstStateReceiver = sut.vmState.testIn(backgroundScope)
             val secondStateReceiver = sut.secondVmState.testIn(backgroundScope)
