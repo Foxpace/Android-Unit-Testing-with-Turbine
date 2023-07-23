@@ -3,7 +3,7 @@
 package com.tomasrepcik.turbineexample
 
 import app.cash.turbine.test
-import app.cash.turbine.testIn
+import app.cash.turbine.turbineScope
 import com.tomasrepcik.turbineexample.repo.HeavyComputationTemplate
 import com.tomasrepcik.turbineexample.vm.ExampleViewModel
 import com.tomasrepcik.turbineexample.vm.VmEvents
@@ -78,34 +78,36 @@ class TurbineViewModelTest {
     @Test
     fun `Given the ViewModel waits - When the event OnLaunch comes, then both computations runs successfully`() =
         runTest {
-            // ARRANGE
-            val expectedString = "Result"
-            heavyComputation.stub {
-                onBlocking { doComputation() } doAnswer { expectedString }
+            turbineScope {
+                // ARRANGE
+                val expectedString = "Result"
+                heavyComputation.stub {
+                    onBlocking { doComputation() } doAnswer { expectedString }
+                }
+
+                val sut = ExampleViewModel(heavyComputation)
+
+                val firstStateReceiver = sut.vmState.testIn(backgroundScope)
+                val secondStateReceiver = sut.secondVmState.testIn(backgroundScope)
+
+                // ACTION
+                sut.onEvent(VmEvents.OnLaunch)
+
+                // CHECK
+                assertEquals(VmState.Waiting, firstStateReceiver.awaitItem())
+                assertEquals(VmState.Waiting, secondStateReceiver.awaitItem())
+
+                assertEquals(VmState.Running, firstStateReceiver.awaitItem())
+                assertEquals(VmState.Running, secondStateReceiver.awaitItem())
+
+                assertEquals(VmState.Finished(expectedString), firstStateReceiver.awaitItem())
+                assertEquals(VmState.Finished(expectedString), secondStateReceiver.awaitItem())
+
+                assertEquals(VmState.Waiting, firstStateReceiver.awaitItem())
+                assertEquals(VmState.Waiting, secondStateReceiver.awaitItem())
+
+                firstStateReceiver.cancel()
+                secondStateReceiver.cancel()
             }
-
-            val sut = ExampleViewModel(heavyComputation)
-
-            val firstStateReceiver = sut.vmState.testIn(backgroundScope)
-            val secondStateReceiver = sut.secondVmState.testIn(backgroundScope)
-
-            // ACTION
-            sut.onEvent(VmEvents.OnLaunch)
-
-            // CHECK
-            assertEquals(VmState.Waiting, firstStateReceiver.awaitItem())
-            assertEquals(VmState.Waiting, secondStateReceiver.awaitItem())
-
-            assertEquals(VmState.Running, firstStateReceiver.awaitItem())
-            assertEquals(VmState.Running, secondStateReceiver.awaitItem())
-
-            assertEquals(VmState.Finished(expectedString), firstStateReceiver.awaitItem())
-            assertEquals(VmState.Finished(expectedString), secondStateReceiver.awaitItem())
-
-            assertEquals(VmState.Waiting, firstStateReceiver.awaitItem())
-            assertEquals(VmState.Waiting, secondStateReceiver.awaitItem())
-
-            firstStateReceiver.cancel()
-            secondStateReceiver.cancel()
         }
 }
